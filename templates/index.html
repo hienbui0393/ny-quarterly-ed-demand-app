@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Quarterly ED Demand{% endblock %}
+{% block content %}
+
+<section class="card hero-card">
+  <div>
+    <span class="badge">Recommended method</span>
+    <h2>{{ artifact.recommended_method }}</h2>
+    <p>
+      Select a facility county and either request its next-quarter prototype
+      forecast or review a historical quarter. The app builds all technical
+      inputs from the saved panel; the user does not enter model features.
+    </p>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Run the app</h2>
+  <form action="{{ url_for('predict_form') }}" method="post">
+    <label for="fips">Facility county</label>
+    <select id="fips" name="fips" required>
+      {% for county in counties %}
+        <option value="{{ county.fips }}">{{ county.name }}</option>
+      {% endfor %}
+    </select>
+
+    <label for="period">Target period</label>
+    <select id="period" name="period" required>
+      <option value="next" selected>Next quarter — recommended forecast</option>
+      {% for item in historical_periods %}
+        <option value="{{ item.value }}">{{ item.label }} — historical comparison</option>
+      {% endfor %}
+    </select>
+
+    <button type="submit">Generate result</button>
+  </form>
+
+  <p class="note">
+    The next-quarter result uses the notebook's recommended method. The tuned ML
+    estimate is not fabricated when future ACS and weather predictors have not
+    been refreshed.
+  </p>
+</section>
+
+<section class="summary-grid">
+  <div class="mini-card">
+    <span class="mini-label">Selected ML model</span>
+    <strong>{{ artifact.model_name }}</strong>
+  </div>
+  <div class="mini-card">
+    <span class="mini-label">Final holdout</span>
+    <strong>{{ artifact.holdout_year }}</strong>
+  </div>
+  <div class="mini-card">
+    <span class="mini-label">Model features</span>
+    <strong>{{ n_features }}</strong>
+  </div>
+  <div class="mini-card">
+    <span class="mini-label">Data snapshot</span>
+    <strong>{{ artifact.data_as_of_date }}</strong>
+  </div>
+</section>
+
+{% if metrics %}
+<section class="card">
+  <h2>Final holdout comparison</h2>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Method</th>
+          <th>MAE</th>
+          <th>WAPE</th>
+          <th>Skill</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in metrics %}
+        <tr>
+          <td>{{ row.method }}</td>
+          <td>{{ row.mae|count }}</td>
+          <td>{{ row.wape_percent|decimal }}%</td>
+          <td>{{ row.skill|decimal }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="note">
+    Lower MAE and WAPE are better. Positive skill means improvement over the
+    strongest persistence benchmark; negative skill means worse performance.
+  </p>
+</section>
+{% endif %}
+
+{% endblock %}

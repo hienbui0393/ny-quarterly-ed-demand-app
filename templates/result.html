@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Forecast Result{% endblock %}
+{% block content %}
+
+{% if error %}
+<section class="card error-card">
+  <h2>Result unavailable</h2>
+  <p>{{ error }}</p>
+  <a class="text-link" href="{{ url_for('index') }}">Return to the form</a>
+</section>
+{% else %}
+<section class="card">
+  <div class="result-heading">
+    <div>
+      <p class="eyebrow dark">{{ "Next-quarter forecast" if result.mode == "forecast" else "Historical comparison" }}</p>
+      <h2>{{ result.county }} · {{ result.period }}</h2>
+    </div>
+    <span class="badge">Recommended: {{ result.recommended_method }}</span>
+  </div>
+
+  {% if result.mode == "forecast" %}
+  <p>
+    Based on the latest observed period, <strong>{{ result.source_period }}</strong>.
+  </p>
+  {% endif %}
+
+  <div class="stats">
+    {% if result.actual is not none %}
+    <div class="stat actual">
+      <span class="label">Observed encounters</span>
+      <span class="value">{{ result.actual|count }}</span>
+      <span class="unit">actual total</span>
+    </div>
+    {% endif %}
+
+    <div class="stat {% if result.recommended_method == 'Previous-quarter persistence' %}recommended{% endif %}">
+      <span class="label">Previous-quarter persistence</span>
+      <span class="value">{{ result.previous_quarter|count }}</span>
+      <span class="unit">encounters</span>
+    </div>
+
+    <div class="stat {% if result.recommended_method == 'Seasonal persistence' %}recommended{% endif %}">
+      <span class="label">Seasonal persistence</span>
+      <span class="value">{{ result.seasonal|count }}</span>
+      <span class="unit">same quarter last year</span>
+    </div>
+
+    <div class="stat {% if result.recommended_method not in ['Previous-quarter persistence', 'Seasonal persistence'] %}recommended{% endif %}">
+      <span class="label">{{ result.ml_method }}</span>
+      <span class="value">{{ result.ml_prediction|count }}</span>
+      <span class="unit">tuned ML estimate</span>
+    </div>
+  </div>
+
+  <p class="note">{{ result.note }}</p>
+
+  {% if result.errors %}
+  <h3>Absolute error for this historical quarter</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Method</th><th>Absolute error</th></tr></thead>
+      <tbody>
+        {% for item in result.errors %}
+        <tr>
+          <td>{{ item.method }}{% if item.method == result.best_method %} <span class="small-badge">closest</span>{% endif %}</td>
+          <td>{{ item.absolute_error|count }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  <a class="button-link" href="{{ url_for('index') }}">Run another result</a>
+</section>
+{% endif %}
+
+{% endblock %}
