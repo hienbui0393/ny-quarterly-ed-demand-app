@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block title %}Compare Facility Counties{% endblock %}
+{% block content %}
+
+<section class="card hero-card">
+  <span class="badge">Multi-county extension</span>
+  <h2>Compare a method with previous-quarter persistence</h2>
+  <p>
+    Select two to ten facility counties and one historical quarter. The pooled
+    skill score shows whether the selected method improves on the project's
+    strongest persistence benchmark across those counties.
+  </p>
+</section>
+
+<section class="card">
+  <h2>Comparison settings</h2>
+  <form action="{{ url_for('compare') }}" method="post">
+    <label for="fips">Facility counties</label>
+    <select id="fips" name="fips" multiple size="10" required>
+      {% for county in counties %}
+        <option value="{{ county.fips }}" {% if county.fips in selected_counties %}selected{% endif %}>
+          {{ county.name }}
+        </option>
+      {% endfor %}
+    </select>
+    <p class="field-help">Use Ctrl on Windows or Command on macOS to select multiple counties.</p>
+
+    <label for="period">Historical quarter</label>
+    <select id="period" name="period" required>
+      {% for item in historical_periods %}
+        <option value="{{ item.value }}" {% if item.value == selected_period %}selected{% endif %}>
+          {{ item.label }}
+        </option>
+      {% endfor %}
+    </select>
+
+    <label for="method">Method to compare</label>
+    <select id="method" name="method" required>
+      {% for item in method_options %}
+        <option value="{{ item.value }}" {% if item.value == selected_method %}selected{% endif %}>
+          {{ item.label }}
+        </option>
+      {% endfor %}
+    </select>
+
+    <button type="submit">Compare selected counties</button>
+  </form>
+</section>
+
+{% if error %}
+<section class="card error-card">
+  <h2>Comparison unavailable</h2>
+  <p>{{ error }}</p>
+</section>
+{% endif %}
+
+{% if comparison %}
+<section class="summary-grid compare-summary">
+  <div class="mini-card">
+    <span class="mini-label">Historical quarter</span>
+    <strong>{{ comparison.period }}</strong>
+  </div>
+  <div class="mini-card">
+    <span class="mini-label">Counties compared</span>
+    <strong>{{ comparison.county_count }}</strong>
+  </div>
+  <div class="mini-card">
+    <span class="mini-label">Selected method MAE</span>
+    <strong>{{ comparison.selected_mae|count }}</strong>
+  </div>
+  <div class="mini-card">
+    <span class="mini-label">Skill vs persistence</span>
+    <strong>{{ comparison.skill_percent|decimal }}%</strong>
+  </div>
+</section>
+
+<section class="card">
+  <h2>{{ comparison.selected_method }} vs previous-quarter persistence</h2>
+  <p>
+    The selected method was closer in <strong>{{ comparison.wins }}</strong> of
+    <strong>{{ comparison.county_count }}</strong> counties. Previous-quarter
+    persistence MAE was <strong>{{ comparison.previous_mae|count }}</strong>.
+  </p>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Facility county</th>
+          <th>Observed</th>
+          <th>Selected prediction</th>
+          <th>Selected error</th>
+          <th>Persistence error</th>
+          <th>Skill</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in comparison.rows %}
+        <tr>
+          <td>{{ row.county }}</td>
+          <td>{{ row.actual|count }}</td>
+          <td>{{ row.selected_prediction|count }}</td>
+          <td>{{ row.selected_error|count }}</td>
+          <td>{{ row.previous_error|count }}</td>
+          <td>{{ row.skill_percent|decimal }}%</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="note">
+    Positive skill means the selected method reduced MAE relative to
+    previous-quarter persistence; negative skill means it performed worse.
+  </p>
+</section>
+{% endif %}
+
+{% endblock %}

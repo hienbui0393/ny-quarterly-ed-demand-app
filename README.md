@@ -1,20 +1,45 @@
 # New York Quarterly ED Demand App
 
-A simple Flask app for the DATA 975 capstone. It presents total emergency
-department encounters by **facility county and quarter** and compares:
+A simple Flask application for the DATA 975 capstone. It presents total
+emergency department encounters by **facility county and quarter** and compares:
 
 - the tuned XGBoost estimate;
 - previous-quarter persistence;
 - same-quarter previous-year persistence.
 
 The notebook recommends previous-quarter persistence, so the app uses it as the
-primary next-quarter prototype forecast and keeps the ML estimate visible for
-historical comparison.
+default prototype forecast and keeps the ML estimate visible for historical
+comparison.
 
-## Recommended structure
+## Live application
 
-For the simplest GitHub and Render setup, use this application folder as the
-repository root:
+https://ny-quarterly-ed-demand-app.onrender.com/
+
+## Project scope
+
+- Unit: one New York facility county-quarter
+- Target: total ED encounters
+- Panel: 2019 Q1 through 2024 Q4 in the deployed snapshot
+- Selected ML model: XGBoost — level
+- Recommended method: previous-quarter persistence
+- Deployment purpose: retrospective planning prototype, not a live staffing feed
+
+## Main features
+
+- **One-quarter-ahead prototype:** forecasts the first quarter after the latest
+  available panel period using the selected method.
+- **Historical comparison:** shows observed encounters, XGBoost, previous-quarter
+  persistence, seasonal persistence, and absolute errors.
+- **Method selector:** lets a reviewer emphasize the recommended method, XGBoost,
+  previous-quarter persistence, or seasonal persistence.
+- **Multi-county comparison:** compares XGBoost or seasonal persistence with
+  previous-quarter persistence across two to ten counties and reports pooled
+  skill.
+- **Health and JSON endpoints:** `/health` and `/api/predict`.
+- **Clear limitations:** explains facility-county scope, public suppression, and
+  the difference between the latest panel quarter and the current calendar date.
+
+## Repository structure
 
 ```text
 ed-demand-app/
@@ -27,37 +52,31 @@ ed-demand-app/
 ├── Procfile
 ├── model/
 │   ├── quarterly_ed_forecast_artifact.joblib
+│   ├── quarterly_ed_xgboost_model.json
 │   ├── county_quarter_analysis.csv
 │   └── README.md
 ├── templates/
 │   ├── base.html
 │   ├── index.html
-│   └── result.html
+│   ├── result.html
+│   └── compare.html
 ├── static/
 │   └── style.css
 └── tests/
-    └── smoke_test.py
+    ├── smoke_test.py
+    └── production_load_test.py
 ```
 
-You may add `notebooks/ed_demand_pipeline.ipynb` to the same repository for your
-portfolio. The app does not need the notebook to run.
+The model files are project-specific outputs from the final Colab notebook. See
+`model/README.md`.
 
-## 1. Add the two final files
-
-Follow `model/README.md`. Do not copy the older annual artifact or obsolete
-quarterly artifacts. The application will not start until both required files
-are present.
-
-## 2. Create a local virtual environment
-
-A `.venv` is recommended locally, but it must not be uploaded to GitHub or
-Render. It is already excluded by `.gitignore`.
+## Local setup
 
 ### Windows PowerShell
 
 ```powershell
 py -3.12 -m venv .venv
-.venv\Scripts\Activate.ps1
+.\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
 pip install -r requirements.txt
 pip check
@@ -73,30 +92,31 @@ pip install -r requirements.txt
 pip check
 ```
 
-## 3. Test and run locally
+## Test and run
 
 ```bash
 python tests/smoke_test.py
+python tests/production_load_test.py
 python app.py
 ```
 
 Open `http://127.0.0.1:5000` and test:
 
 - one historical quarter;
-- the next-quarter result;
+- the one-quarter-ahead prototype;
+- the multi-county comparison;
 - `http://127.0.0.1:5000/health`.
 
-The smoke test uses temporary synthetic files and does not overwrite the real
-artifact or panel.
+## Interpretation
 
-## App behavior
+Positive skill means the selected method improves on previous-quarter
+persistence; negative skill means it performs worse. The app reports skill as a
+percentage to make the comparison easier to read.
 
-- **Historical quarter:** shows observed encounters, tuned ML,
-  previous-quarter persistence, seasonal persistence, and absolute errors.
-- **Next quarter:** uses the artifact's recommended method. The app does not
-  invent an ML estimate when a complete future predictor row is unavailable.
+## Limitations
 
-This is a retrospective public-data prototype. A live staffing system would
-require a current internal encounter feed and a refreshed predictor pipeline.
-
-See `DEPLOYMENT.md` for the short GitHub and Render workflow.
+This is a retrospective public-data prototype. Facility county is not
+necessarily the patient's county of residence. Publicly suppressed facility
+values may understate totals in affected facility county-quarters. A live
+operational deployment would require a current internal encounter feed and a
+refreshed predictor pipeline.

@@ -12,7 +12,9 @@
 <section class="card">
   <div class="result-heading">
     <div>
-      <p class="eyebrow dark">{{ "Next-quarter forecast" if result.mode == "forecast" else "Historical comparison" }}</p>
+      <p class="eyebrow dark">
+        {{ "One-quarter-ahead prototype forecast" if result.mode == "forecast" else "Historical comparison" }}
+      </p>
       <h2>{{ result.county }} · {{ result.period }}</h2>
     </div>
     <span class="badge">Recommended: {{ result.recommended_method }}</span>
@@ -20,10 +22,22 @@
 
   {% if result.mode == "forecast" %}
   <p>
-    Based on the latest observed period, <strong>{{ result.source_period }}</strong>.
+    This forecast follows the latest observed panel period,
+    <strong>{{ result.source_period }}</strong>.
   </p>
   {% endif %}
 
+  <div class="primary-result">
+    <span class="mini-label">Selected forecasting method</span>
+    <h3>{{ result.selected_method }}</h3>
+    <span class="primary-value">{{ result.selected_prediction|count }}</span>
+    <span class="unit">encounters</span>
+    {% if result.actual is not none %}
+      <p>Observed: <strong>{{ result.actual|count }}</strong> · Absolute error: <strong>{{ result.selected_error|count }}</strong></p>
+    {% endif %}
+  </div>
+
+  <h3>Other available methods</h3>
   <div class="stats">
     {% if result.actual is not none %}
     <div class="stat actual">
@@ -33,23 +47,18 @@
     </div>
     {% endif %}
 
-    <div class="stat {% if result.recommended_method == 'Previous-quarter persistence' %}recommended{% endif %}">
-      <span class="label">Previous-quarter persistence</span>
-      <span class="value">{{ result.previous_quarter|count }}</span>
-      <span class="unit">encounters</span>
+    {% for item in result.cards %}
+    <div class="stat {% if item.recommended %}recommended{% endif %}">
+      <span class="label">{{ item.label }}</span>
+      {% if item.prediction is none %}
+        <span class="unavailable">Estimate unavailable</span>
+        <span class="unit">Future ACS and weather predictors have not been refreshed.</span>
+      {% else %}
+        <span class="value">{{ item.prediction|count }}</span>
+        <span class="unit">{{ item.detail }}</span>
+      {% endif %}
     </div>
-
-    <div class="stat {% if result.recommended_method == 'Seasonal persistence' %}recommended{% endif %}">
-      <span class="label">Seasonal persistence</span>
-      <span class="value">{{ result.seasonal|count }}</span>
-      <span class="unit">same quarter last year</span>
-    </div>
-
-    <div class="stat {% if result.recommended_method not in ['Previous-quarter persistence', 'Seasonal persistence'] %}recommended{% endif %}">
-      <span class="label">{{ result.ml_method }}</span>
-      <span class="value">{{ result.ml_prediction|count }}</span>
-      <span class="unit">tuned ML estimate</span>
-    </div>
+    {% endfor %}
   </div>
 
   <p class="note">{{ result.note }}</p>
@@ -62,7 +71,11 @@
       <tbody>
         {% for item in result.errors %}
         <tr>
-          <td>{{ item.method }}{% if item.method == result.best_method %} <span class="small-badge">closest</span>{% endif %}</td>
+          <td>
+            {{ item.method }}
+            {% if item.method == result.best_method %}<span class="small-badge">closest</span>{% endif %}
+            {% if item.recommended %}<span class="small-badge neutral">recommended</span>{% endif %}
+          </td>
           <td>{{ item.absolute_error|count }}</td>
         </tr>
         {% endfor %}
@@ -71,7 +84,10 @@
   </div>
   {% endif %}
 
-  <a class="button-link" href="{{ url_for('index') }}">Run another result</a>
+  <div class="button-row">
+    <a class="button-link" href="{{ url_for('index') }}">Run another result</a>
+    <a class="button-link secondary" href="{{ url_for('compare') }}">Compare counties</a>
+  </div>
 </section>
 {% endif %}
 

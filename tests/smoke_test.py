@@ -1,4 +1,4 @@
-"""Smoke-test every Flask route without touching the real model files.
+"""Smoke-test Flask routes without touching the real model files.
 
 Run from the project root:
     python tests/smoke_test.py
@@ -66,34 +66,35 @@ def build_panel() -> pd.DataFrame:
                 value = float(base + seasonal + rng.normal(0, 700))
                 facility_count = int(3 + is_nyc * 5 + rng.integers(0, 2))
 
-                row = {
-                    "fips": fips,
-                    "county_name": name,
-                    "year": year,
-                    "quarter": quarter,
-                    TARGET: value,
-                    "target_lag1": values[-1] if len(values) >= 1 else np.nan,
-                    "target_lag2": values[-2] if len(values) >= 2 else np.nan,
-                    "target_lag3": values[-3] if len(values) >= 3 else np.nan,
-                    "target_lag4": values[-4] if len(values) >= 4 else np.nan,
-                    "facility_count_lag1": facility_counts[-1] if facility_counts else np.nan,
-                    "acs_lag2_population_100k": 3.1 + is_nyc * 12,
-                    "is_nyc": is_nyc,
-                    "lat": lat,
-                    "acs_lag2_pct_65plus": 14.0 + rng.random(),
-                    "acs_lag2_pct_under5": 5.0 + rng.random(),
-                    "weather_lag4_wet_days": 25 + rng.integers(0, 8),
-                    "acs_lag2_median_income": 65000 + is_nyc * 18000,
-                    "lon": lon,
-                    "is_downstate_non_nyc": downstate,
-                    "acs_lag2_poverty_rate": 11 + is_nyc * 8,
-                    "weather_lag4_snowfall_total": rng.random() * 15,
-                    "weather_lag4_hot_days": rng.integers(0, 12),
-                    "weather_lag4_tavg_mean": 48 + rng.random() * 8,
-                    "weather_lag4_freeze_days": rng.integers(0, 18),
-                    "weather_lag4_precip_total": 8 + rng.random() * 5,
-                }
-                rows.append(row)
+                rows.append(
+                    {
+                        "fips": fips,
+                        "county_name": name,
+                        "year": year,
+                        "quarter": quarter,
+                        TARGET: value,
+                        "target_lag1": values[-1] if len(values) >= 1 else np.nan,
+                        "target_lag2": values[-2] if len(values) >= 2 else np.nan,
+                        "target_lag3": values[-3] if len(values) >= 3 else np.nan,
+                        "target_lag4": values[-4] if len(values) >= 4 else np.nan,
+                        "facility_count_lag1": facility_counts[-1] if facility_counts else np.nan,
+                        "acs_lag2_population_100k": 3.1 + is_nyc * 12,
+                        "is_nyc": is_nyc,
+                        "lat": lat,
+                        "acs_lag2_pct_65plus": 14.0 + rng.random(),
+                        "acs_lag2_pct_under5": 5.0 + rng.random(),
+                        "weather_lag4_wet_days": 25 + rng.integers(0, 8),
+                        "acs_lag2_median_income": 65000 + is_nyc * 18000,
+                        "lon": lon,
+                        "is_downstate_non_nyc": downstate,
+                        "acs_lag2_poverty_rate": 11 + is_nyc * 8,
+                        "weather_lag4_snowfall_total": rng.random() * 15,
+                        "weather_lag4_hot_days": rng.integers(0, 12),
+                        "weather_lag4_tavg_mean": 48 + rng.random() * 8,
+                        "weather_lag4_freeze_days": rng.integers(0, 18),
+                        "weather_lag4_precip_total": 8 + rng.random() * 5,
+                    }
+                )
                 values.append(value)
                 facility_counts.append(facility_count)
 
@@ -123,7 +124,7 @@ def build_artifact(panel: pd.DataFrame) -> dict:
                 "skill_vs_strongest_persistence": 0.0,
             },
             {
-                "model": "Tuned XGBoost — level",
+                "model": "Synthetic Random Forest — level",
                 "MAE": 2157.9,
                 "WAPE": 0.0578,
                 "skill_vs_strongest_persistence": -0.7227,
@@ -157,25 +158,50 @@ def main() -> None:
         home = client.get("/")
         assert home.status_code == 200
         assert b"Facility county" in home.data
+        assert b"Scope and limitations" in home.data
         print("GET / -> 200")
 
         historical = client.post(
             "/predict",
-            data={"fips": "36001", "period": "2024-Q4"},
+            data={"fips": "36001", "period": "2024-Q4", "method": "ml"},
         )
         assert historical.status_code == 200
         assert b"Historical comparison" in historical.data
-        assert b"Observed encounters" in historical.data
+        assert b"Selected forecasting method" in historical.data
         print("POST /predict historical -> 200")
 
-        future = client.get("/api/predict?fips=36001&period=next")
+        future = client.get(
+            "/api/predict?fips=36001&period=next&method=recommended"
+        )
         assert future.status_code == 200, future.get_json()
         payload = future.get_json()
         assert payload["mode"] == "forecast"
         assert payload["period"] == "2025 Q1"
-        assert payload["recommended_prediction"] is not None
-        assert payload["ml_prediction"] is None
+        assert payload["selected_prediction"] is not None
         print("GET /api/predict next -> 200")
+
+        unavailable_ml = client.get(
+            "/api/predict?fips=36001&period=next&method=ml"
+        )
+        assert unavailable_ml.status_code == 400
+        print("Unavailable future ML -> 400")
+
+        compare_page = client.get("/compare")
+        assert compare_page.status_code == 200
+        assert b"Compare a method" in compare_page.data
+        print("GET /compare -> 200")
+
+        comparison = client.post(
+            "/compare",
+            data={
+                "fips": ["36001", "36005"],
+                "period": "2024-Q4",
+                "method": "ml",
+            },
+        )
+        assert comparison.status_code == 200, comparison.get_data(as_text=True)
+        assert b"Skill vs persistence" in comparison.data
+        print("POST /compare -> 200")
 
         bad = client.get("/api/predict?fips=99999&period=next")
         assert bad.status_code == 400

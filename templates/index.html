@@ -3,15 +3,13 @@
 {% block content %}
 
 <section class="card hero-card">
-  <div>
-    <span class="badge">Recommended method</span>
-    <h2>{{ artifact.recommended_method }}</h2>
-    <p>
-      Select a facility county and either request its next-quarter prototype
-      forecast or review a historical quarter. The app builds all technical
-      inputs from the saved panel; the user does not enter model features.
-    </p>
-  </div>
+  <span class="badge">Recommended method</span>
+  <h2>{{ artifact.recommended_method }}</h2>
+  <p>
+    Select a facility county and either generate the first one-quarter-ahead
+    prototype forecast after the latest panel period or review a historical
+    quarter. The app builds all technical inputs from the saved panel.
+  </p>
 </section>
 
 <section class="card">
@@ -26,9 +24,18 @@
 
     <label for="period">Target period</label>
     <select id="period" name="period" required>
-      <option value="next" selected>Next quarter — recommended forecast</option>
+      <option value="next" selected>One-quarter-ahead prototype forecast</option>
       {% for item in historical_periods %}
         <option value="{{ item.value }}">{{ item.label }} — historical comparison</option>
+      {% endfor %}
+    </select>
+
+    <label for="method">Forecasting method to emphasize</label>
+    <select id="method" name="method" required>
+      {% for item in method_options %}
+        <option value="{{ item.value }}" {% if item.value == 'recommended' %}selected{% endif %}>
+          {{ item.label }}
+        </option>
       {% endfor %}
     </select>
 
@@ -36,9 +43,23 @@
   </form>
 
   <p class="note">
-    The next-quarter result uses the notebook's recommended method. The tuned ML
-    estimate is not fabricated when future ACS and weather predictors have not
-    been refreshed.
+    The tuned XGBoost estimate is available for historical comparison. It is not
+    fabricated for the next panel quarter when future ACS and weather predictors
+    have not been refreshed.
+  </p>
+</section>
+
+<section class="card limitation-card">
+  <h2>Scope and limitations</h2>
+  <p>
+    This retrospective prototype uses quarterly public data for New York
+    facility counties. The panel covers <strong>{{ panel_start }}</strong> through
+    <strong>{{ panel_end }}</strong>; therefore, the one-quarter-ahead option is
+    the first quarter after the latest panel period, not a live current-quarter
+    forecast. Facility county is not necessarily the patient's county of
+    residence. Publicly suppressed facility values may understate totals in
+    affected county-quarters. A live operational version would require a current
+    internal encounter feed and refreshed predictors.
   </p>
 </section>
 
@@ -71,7 +92,7 @@
           <th>Method</th>
           <th>MAE</th>
           <th>WAPE</th>
-          <th>Skill</th>
+          <th>Skill vs benchmark</th>
         </tr>
       </thead>
       <tbody>
@@ -80,7 +101,7 @@
           <td>{{ row.method }}</td>
           <td>{{ row.mae|count }}</td>
           <td>{{ row.wape_percent|decimal }}%</td>
-          <td>{{ row.skill|decimal }}</td>
+          <td>{{ row.skill_percent|decimal }}%</td>
         </tr>
         {% endfor %}
       </tbody>

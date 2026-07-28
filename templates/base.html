@@ -9,9 +9,15 @@
 <body>
   <header class="site-header">
     <div class="header-inner">
-      <p class="eyebrow">DATA 975 Capstone</p>
-      <h1>New York Quarterly ED Demand</h1>
-      <p class="sub">Facility-county encounter forecasting and benchmark comparison</p>
+      <div>
+        <p class="eyebrow">DATA 975 Capstone</p>
+        <h1>New York Quarterly ED Demand</h1>
+        <p class="sub">Facility-county encounter forecasting and benchmark comparison</p>
+      </div>
+      <nav aria-label="Main navigation">
+        <a href="{{ url_for('index') }}">Forecast</a>
+        <a href="{{ url_for('compare') }}">Compare counties</a>
+      </nav>
     </div>
   </header>
 
