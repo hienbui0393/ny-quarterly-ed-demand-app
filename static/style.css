@@ -271,27 +271,6 @@ button:hover,
   gap: 15px;
 }
 
-.primary-result {
-  margin: 20px 0;
-  padding: 20px;
-  border: 2px solid var(--success);
-  border-radius: 10px;
-  background: var(--success-bg);
-}
-
-.primary-result h3 {
-  margin: 4px 0;
-  color: var(--success);
-}
-
-.primary-value {
-  display: block;
-  color: var(--navy);
-  font-size: 38px;
-  font-weight: 800;
-  line-height: 1.1;
-}
-
 .stats {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -311,6 +290,18 @@ button:hover,
 .stat.recommended {
   border-left-color: var(--success);
   background: var(--success-bg);
+}
+
+.recommended-method {
+  display: block;
+  margin: 5px 0 2px;
+  color: var(--success);
+  font-size: 16px;
+}
+
+.result-error {
+  margin: 8px 0 0;
+  font-size: 13px;
 }
 
 .stat.actual {
@@ -412,9 +403,5 @@ footer p {
 
   .card {
     padding: 18px;
-  }
-
-  .primary-value {
-    font-size: 32px;
   }
 }

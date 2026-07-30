@@ -27,20 +27,6 @@
   </p>
   {% endif %}
 
-  <div class="primary-result">
-    <span class="mini-label">Recommended prototype result</span>
-    <h3>{{ result.recommended_method }}</h3>
-    <span class="primary-value">{{ result.recommended_prediction|count }}</span>
-    <span class="unit">encounters</span>
-    {% if result.actual is not none %}
-      <p>
-        Observed: <strong>{{ result.actual|count }}</strong> ·
-        Absolute error: <strong>{{ result.recommended_error|count }}</strong>
-      </p>
-    {% endif %}
-  </div>
-
-  <h3>Additional context</h3>
   <div class="stats">
     {% if result.actual is not none %}
     <div class="stat actual">
@@ -51,17 +37,36 @@
     {% endif %}
 
     {% for item in result.cards %}
-    <div class="stat {% if item.recommended %}recommended{% endif %}">
+    <div class="stat">
       <span class="label">{{ item.label }}</span>
+
       {% if item.prediction is none %}
         <span class="unavailable">Estimate unavailable</span>
-        <span class="unit">Future ACS and weather predictors have not been refreshed.</span>
+        <span class="unit">
+          Future ACS and weather predictors have not been refreshed.
+        </span>
       {% else %}
         <span class="value">{{ item.prediction|count }}</span>
         <span class="unit">{{ item.detail }}</span>
       {% endif %}
     </div>
     {% endfor %}
+
+    <div class="stat recommended">
+      <span class="label">Recommended prototype result</span>
+      <strong class="recommended-method">
+        {{ result.recommended_method }}
+      </strong>
+      <span class="value">{{ result.recommended_prediction|count }}</span>
+      <span class="unit">encounters</span>
+
+      {% if result.actual is not none %}
+      <p class="result-error">
+        Observed: <strong>{{ result.actual|count }}</strong> ·
+        Absolute error: <strong>{{ result.recommended_error|count }}</strong>
+      </p>
+      {% endif %}
+    </div>
   </div>
 
   <p class="note">{{ result.note }}</p>
