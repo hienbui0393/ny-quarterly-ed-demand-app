@@ -1,66 +1,73 @@
 # GitHub and Render deployment
 
-This guide applies to the **quarterly facility-county encounter app**. Do not
-use the old annual county-year filenames or forecasting logic.
+This guide applies to the final quarterly facility-county application.
 
-## 1. Preserve the three model files
+## 1. Confirm the project files
 
-Before replacing an older app folder, keep these files from the working
-`model/` folder:
+The `model/` folder must contain:
 
-1. `quarterly_ed_forecast_artifact.joblib`
-2. `quarterly_ed_xgboost_model.json`
-3. `county_quarter_analysis.csv`
+```text
+quarterly_ed_forecast_artifact.joblib
+quarterly_ed_xgboost_model.json
+county_quarter_analysis.csv
+```
 
-Copy them into the updated app's `model/` folder.
+The repository must not contain `.venv`, `__pycache__`, API keys, passwords, or
+raw unnecessary datasets.
 
-## 2. Final local check
+## 2. Test locally
+
+From the project root:
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 pip check
 python tests\smoke_test.py
-python tests\production_load_test.py
 python app.py
 ```
 
 Test:
 
-- a historical quarter;
+- one historical quarter;
 - the one-quarter-ahead prototype;
-- `/compare` with two or more counties;
+- `/compare` with two counties;
 - `/health`.
 
-## 3. Push updates to GitHub
+Stop the server with `Ctrl + C`.
 
-From the repository root:
+## 3. Push changes to GitHub
+
+For an existing repository:
 
 ```powershell
-git add .
 git status
-git commit -m "Improve forecast comparison and app limitations"
+git add .
+git commit -m "Simplify final forecasting app"
 git push
 ```
 
-Confirm `.venv`, tokens, API keys, and raw data are not listed by `git status`.
-Do not place a personal access token in a saved command or repository URL.
+Before committing, confirm `.venv` and `__pycache__` are not listed.
 
-## 4. Render settings
+## 4. Render configuration
 
-Use:
+Use these settings:
 
-- Language: Python 3
-- Build command: `pip install -r requirements.txt`
-- Start command: `gunicorn --workers 1 --threads 4 app:app`
-- Health check path: `/health`
+```text
+Language: Python 3
+Build command: pip install -r requirements.txt
+Start command: gunicorn --workers 1 --threads 4 app:app
+Health check path: /health
+```
 
-The `.python-version` file selects Python 3.12.8. No Census API key is required
-by the Flask app because it reads the final processed panel and saved model.
+The `.python-version` file requests Python 3.12.8.
 
-After deployment, test:
+## 5. Verify the deployment
 
-- `/health`
-- `/`
-- `/compare`
-- `/api/predict?fips=36001&period=2024-Q4&method=ml`
+Open:
+
+```text
+https://ny-quarterly-ed-demand-app.onrender.com/health
+```
+
+Confirm that `status` is `ok`, then test the main page and `/compare`.

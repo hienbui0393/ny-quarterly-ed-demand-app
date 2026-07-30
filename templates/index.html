@@ -6,9 +6,9 @@
   <span class="badge">Recommended method</span>
   <h2>{{ artifact.recommended_method }}</h2>
   <p>
-    Select a facility county and either generate the first one-quarter-ahead
-    prototype forecast after the latest panel period or review a historical
-    quarter. The app builds all technical inputs from the saved panel.
+    Select one facility county and either generate the first one-quarter-ahead
+    prototype after the latest panel period or review a historical quarter.
+    The application builds all model inputs from the saved panel.
   </p>
 </section>
 
@@ -30,22 +30,13 @@
       {% endfor %}
     </select>
 
-    <label for="method">Forecasting method to emphasize</label>
-    <select id="method" name="method" required>
-      {% for item in method_options %}
-        <option value="{{ item.value }}" {% if item.value == 'recommended' %}selected{% endif %}>
-          {{ item.label }}
-        </option>
-      {% endfor %}
-    </select>
-
     <button type="submit">Generate result</button>
   </form>
 
   <p class="note">
-    The tuned XGBoost estimate is available for historical comparison. It is not
-    fabricated for the next panel quarter when future ACS and weather predictors
-    have not been refreshed.
+    The prototype forecast uses the notebook's recommended method. XGBoost is
+    retained for historical evaluation and is not fabricated when future ACS
+    and weather predictors have not been refreshed.
   </p>
 </section>
 
@@ -53,13 +44,13 @@
   <h2>Scope and limitations</h2>
   <p>
     This retrospective prototype uses quarterly public data for New York
-    facility counties. The panel covers <strong>{{ panel_start }}</strong> through
-    <strong>{{ panel_end }}</strong>; therefore, the one-quarter-ahead option is
-    the first quarter after the latest panel period, not a live current-quarter
-    forecast. Facility county is not necessarily the patient's county of
-    residence. Publicly suppressed facility values may understate totals in
-    affected county-quarters. A live operational version would require a current
-    internal encounter feed and refreshed predictors.
+    facility counties. The model-ready panel covers <strong>{{ panel_start }}</strong>
+    through <strong>{{ panel_end }}</strong>; therefore, the one-quarter-ahead
+    option is the first quarter after the latest panel period, not a live
+    current-quarter forecast. Facility county is not necessarily the patient's
+    county of residence. Publicly suppressed facility values may understate
+    totals in affected county-quarters. A live operational version would require
+    a current internal encounter feed and refreshed predictors.
   </p>
 </section>
 

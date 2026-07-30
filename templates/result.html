@@ -28,16 +28,19 @@
   {% endif %}
 
   <div class="primary-result">
-    <span class="mini-label">Selected forecasting method</span>
-    <h3>{{ result.selected_method }}</h3>
-    <span class="primary-value">{{ result.selected_prediction|count }}</span>
+    <span class="mini-label">Recommended prototype result</span>
+    <h3>{{ result.recommended_method }}</h3>
+    <span class="primary-value">{{ result.recommended_prediction|count }}</span>
     <span class="unit">encounters</span>
     {% if result.actual is not none %}
-      <p>Observed: <strong>{{ result.actual|count }}</strong> · Absolute error: <strong>{{ result.selected_error|count }}</strong></p>
+      <p>
+        Observed: <strong>{{ result.actual|count }}</strong> ·
+        Absolute error: <strong>{{ result.recommended_error|count }}</strong>
+      </p>
     {% endif %}
   </div>
 
-  <h3>Other available methods</h3>
+  <h3>Additional context</h3>
   <div class="stats">
     {% if result.actual is not none %}
     <div class="stat actual">
@@ -67,14 +70,20 @@
   <h3>Absolute error for this historical quarter</h3>
   <div class="table-wrap">
     <table>
-      <thead><tr><th>Method</th><th>Absolute error</th></tr></thead>
+      <thead>
+        <tr><th>Method</th><th>Absolute error</th></tr>
+      </thead>
       <tbody>
         {% for item in result.errors %}
         <tr>
           <td>
             {{ item.method }}
-            {% if item.method == result.best_method %}<span class="small-badge">closest</span>{% endif %}
-            {% if item.recommended %}<span class="small-badge neutral">recommended</span>{% endif %}
+            {% if item.method == result.best_method %}
+              <span class="small-badge">closest</span>
+            {% endif %}
+            {% if item.recommended %}
+              <span class="small-badge neutral">recommended</span>
+            {% endif %}
           </td>
           <td>{{ item.absolute_error|count }}</td>
         </tr>
@@ -86,7 +95,7 @@
 
   <div class="button-row">
     <a class="button-link" href="{{ url_for('index') }}">Run another result</a>
-    <a class="button-link secondary" href="{{ url_for('compare') }}">Compare counties</a>
+    <a class="button-link secondary" href="{{ url_for('compare') }}">Evaluate multiple counties</a>
   </div>
 </section>
 {% endif %}

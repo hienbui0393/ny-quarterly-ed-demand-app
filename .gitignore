@@ -18,8 +18,3 @@ Thumbs.db
 
 # Logs
 *.log
-
-# R session files
-.Rhistory
-.RData
-.Rproj.user/

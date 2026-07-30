@@ -1,43 +1,44 @@
 # New York Quarterly ED Demand App
 
-A simple Flask application for the DATA 975 capstone. It presents total
+A focused Flask application for the DATA 975 capstone. It presents total
 emergency department encounters by **facility county and quarter** and compares:
 
 - the tuned XGBoost estimate;
 - previous-quarter persistence;
 - same-quarter previous-year persistence.
 
-The notebook recommends previous-quarter persistence, so the app uses it as the
-default prototype forecast and keeps the ML estimate visible for historical
-comparison.
+The final analysis recommends previous-quarter persistence, so the application
+uses it for the one-quarter-ahead prototype and retains XGBoost for historical
+evaluation.
 
 ## Live application
 
 https://ny-quarterly-ed-demand-app.onrender.com/
 
+## Final design
+
+The application intentionally remains simple:
+
+- **Main page:** choose one county and one period.
+- **Prototype forecast:** uses the notebook's recommended method.
+- **Historical result:** shows observed demand, XGBoost, and both persistence
+  benchmarks.
+- **Multi-county evaluation:** compares XGBoost with previous-quarter
+  persistence across two to ten counties.
+- **Limitations banner:** prevents the retrospective result from being read as a
+  live current-quarter forecast.
+
+The application does **not** include a Ridge/Random Forest/XGBoost selector or a
+map. XGBoost is the single deployed ML model selected by the final notebook.
+
 ## Project scope
 
 - Unit: one New York facility county-quarter
 - Target: total ED encounters
-- Panel: 2019 Q1 through 2024 Q4 in the deployed snapshot
+- Deployed model-ready panel: 2019 Q1 through 2024 Q4
 - Selected ML model: XGBoost — level
 - Recommended method: previous-quarter persistence
-- Deployment purpose: retrospective planning prototype, not a live staffing feed
-
-## Main features
-
-- **One-quarter-ahead prototype:** forecasts the first quarter after the latest
-  available panel period using the selected method.
-- **Historical comparison:** shows observed encounters, XGBoost, previous-quarter
-  persistence, seasonal persistence, and absolute errors.
-- **Method selector:** lets a reviewer emphasize the recommended method, XGBoost,
-  previous-quarter persistence, or seasonal persistence.
-- **Multi-county comparison:** compares XGBoost or seasonal persistence with
-  previous-quarter persistence across two to ten counties and reports pooled
-  skill.
-- **Health and JSON endpoints:** `/health` and `/api/predict`.
-- **Clear limitations:** explains facility-county scope, public suppression, and
-  the difference between the latest panel quarter and the current calendar date.
+- Purpose: retrospective planning prototype, not a live staffing feed
 
 ## Repository structure
 
@@ -55,6 +56,8 @@ ed-demand-app/
 │   ├── quarterly_ed_xgboost_model.json
 │   ├── county_quarter_analysis.csv
 │   └── README.md
+├── notebooks/
+│   └── ed_demand_pipeline.ipynb
 ├── templates/
 │   ├── base.html
 │   ├── index.html
@@ -63,12 +66,8 @@ ed-demand-app/
 ├── static/
 │   └── style.css
 └── tests/
-    ├── smoke_test.py
-    └── production_load_test.py
+    └── smoke_test.py
 ```
-
-The model files are project-specific outputs from the final Colab notebook. See
-`model/README.md`.
 
 ## Local setup
 
@@ -96,27 +95,24 @@ pip check
 
 ```bash
 python tests/smoke_test.py
-python tests/production_load_test.py
 python app.py
 ```
 
-Open `http://127.0.0.1:5000` and test:
+Open:
 
-- one historical quarter;
-- the one-quarter-ahead prototype;
-- the multi-county comparison;
-- `http://127.0.0.1:5000/health`.
+- `http://127.0.0.1:5000/`
+- `http://127.0.0.1:5000/compare`
+- `http://127.0.0.1:5000/health`
 
 ## Interpretation
 
-Positive skill means the selected method improves on previous-quarter
-persistence; negative skill means it performs worse. The app reports skill as a
-percentage to make the comparison easier to read.
+Skill is the percentage reduction in MAE relative to previous-quarter
+persistence. Positive skill favors XGBoost; negative skill favors persistence.
 
 ## Limitations
 
 This is a retrospective public-data prototype. Facility county is not
-necessarily the patient's county of residence. Publicly suppressed facility
-values may understate totals in affected facility county-quarters. A live
-operational deployment would require a current internal encounter feed and a
-refreshed predictor pipeline.
+necessarily the patient's county of residence. Public suppression may
+understate totals in affected facility county-quarters. A live operational
+version would require a current internal encounter feed and refreshed
+predictors.

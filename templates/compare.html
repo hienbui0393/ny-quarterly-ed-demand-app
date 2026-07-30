@@ -1,19 +1,19 @@
 {% extends "base.html" %}
-{% block title %}Compare Facility Counties{% endblock %}
+{% block title %}Multi-County Evaluation{% endblock %}
 {% block content %}
 
 <section class="card hero-card">
-  <span class="badge">Multi-county extension</span>
-  <h2>Compare a method with previous-quarter persistence</h2>
+  <span class="badge">Optional academic extension</span>
+  <h2>Evaluate XGBoost across multiple counties</h2>
   <p>
-    Select two to ten facility counties and one historical quarter. The pooled
-    skill score shows whether the selected method improves on the project's
-    strongest persistence benchmark across those counties.
+    Select two to ten facility counties and one historical quarter. The page
+    compares the tuned XGBoost model with previous-quarter persistence and
+    reports pooled skill across the selected counties.
   </p>
 </section>
 
 <section class="card">
-  <h2>Comparison settings</h2>
+  <h2>Evaluation settings</h2>
   <form action="{{ url_for('compare') }}" method="post">
     <label for="fips">Facility counties</label>
     <select id="fips" name="fips" multiple size="10" required>
@@ -23,7 +23,9 @@
         </option>
       {% endfor %}
     </select>
-    <p class="field-help">Use Ctrl on Windows or Command on macOS to select multiple counties.</p>
+    <p class="field-help">
+      Hold Ctrl on Windows or Command on macOS while clicking to select multiple counties.
+    </p>
 
     <label for="period">Historical quarter</label>
     <select id="period" name="period" required>
@@ -34,22 +36,13 @@
       {% endfor %}
     </select>
 
-    <label for="method">Method to compare</label>
-    <select id="method" name="method" required>
-      {% for item in method_options %}
-        <option value="{{ item.value }}" {% if item.value == selected_method %}selected{% endif %}>
-          {{ item.label }}
-        </option>
-      {% endfor %}
-    </select>
-
-    <button type="submit">Compare selected counties</button>
+    <button type="submit">Evaluate selected counties</button>
   </form>
 </section>
 
 {% if error %}
 <section class="card error-card">
-  <h2>Comparison unavailable</h2>
+  <h2>Evaluation unavailable</h2>
   <p>{{ error }}</p>
 </section>
 {% endif %}
@@ -61,12 +54,12 @@
     <strong>{{ comparison.period }}</strong>
   </div>
   <div class="mini-card">
-    <span class="mini-label">Counties compared</span>
+    <span class="mini-label">Counties evaluated</span>
     <strong>{{ comparison.county_count }}</strong>
   </div>
   <div class="mini-card">
-    <span class="mini-label">Selected method MAE</span>
-    <strong>{{ comparison.selected_mae|count }}</strong>
+    <span class="mini-label">XGBoost MAE</span>
+    <strong>{{ comparison.ml_mae|count }}</strong>
   </div>
   <div class="mini-card">
     <span class="mini-label">Skill vs persistence</span>
@@ -75,20 +68,22 @@
 </section>
 
 <section class="card">
-  <h2>{{ comparison.selected_method }} vs previous-quarter persistence</h2>
+  <h2>{{ ml_method }} vs previous-quarter persistence</h2>
   <p>
-    The selected method was closer in <strong>{{ comparison.wins }}</strong> of
-    <strong>{{ comparison.county_count }}</strong> counties. Previous-quarter
-    persistence MAE was <strong>{{ comparison.previous_mae|count }}</strong>.
+    XGBoost was closer in <strong>{{ comparison.wins }}</strong> of
+    <strong>{{ comparison.county_count }}</strong> selected counties.
+    Previous-quarter persistence MAE was
+    <strong>{{ comparison.previous_mae|count }}</strong>.
   </p>
+
   <div class="table-wrap">
     <table>
       <thead>
         <tr>
           <th>Facility county</th>
           <th>Observed</th>
-          <th>Selected prediction</th>
-          <th>Selected error</th>
+          <th>XGBoost prediction</th>
+          <th>XGBoost error</th>
           <th>Persistence error</th>
           <th>Skill</th>
         </tr>
@@ -98,8 +93,8 @@
         <tr>
           <td>{{ row.county }}</td>
           <td>{{ row.actual|count }}</td>
-          <td>{{ row.selected_prediction|count }}</td>
-          <td>{{ row.selected_error|count }}</td>
+          <td>{{ row.ml_prediction|count }}</td>
+          <td>{{ row.ml_error|count }}</td>
           <td>{{ row.previous_error|count }}</td>
           <td>{{ row.skill_percent|decimal }}%</td>
         </tr>
@@ -107,9 +102,10 @@
       </tbody>
     </table>
   </div>
+
   <p class="note">
-    Positive skill means the selected method reduced MAE relative to
-    previous-quarter persistence; negative skill means it performed worse.
+    Positive skill means XGBoost reduced MAE relative to previous-quarter
+    persistence. Negative skill means the simpler persistence benchmark was better.
   </p>
 </section>
 {% endif %}

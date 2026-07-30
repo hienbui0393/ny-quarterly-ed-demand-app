@@ -51,6 +51,7 @@ COUNTIES = [
 
 
 def build_panel() -> pd.DataFrame:
+    """Create a small synthetic county-quarter panel for route testing."""
     rng = np.random.default_rng(7)
     rows: list[dict] = []
 
@@ -77,7 +78,9 @@ def build_panel() -> pd.DataFrame:
                         "target_lag2": values[-2] if len(values) >= 2 else np.nan,
                         "target_lag3": values[-3] if len(values) >= 3 else np.nan,
                         "target_lag4": values[-4] if len(values) >= 4 else np.nan,
-                        "facility_count_lag1": facility_counts[-1] if facility_counts else np.nan,
+                        "facility_count_lag1": (
+                            facility_counts[-1] if facility_counts else np.nan
+                        ),
                         "acs_lag2_population_100k": 3.1 + is_nyc * 12,
                         "is_nyc": is_nyc,
                         "lat": lat,
@@ -102,9 +105,11 @@ def build_panel() -> pd.DataFrame:
 
 
 def build_artifact(panel: pd.DataFrame) -> dict:
+    """Fit a small embedded estimator for isolated smoke testing."""
     train = panel.dropna(subset=FEATURES + [TARGET])
     model = RandomForestRegressor(n_estimators=30, random_state=42)
     model.fit(train[FEATURES], train[TARGET])
+
     return {
         "project": "Synthetic quarterly ED smoke test",
         "target": TARGET,
@@ -134,6 +139,7 @@ def build_artifact(panel: pd.DataFrame) -> dict:
 
 
 def main() -> None:
+    """Create temporary files and test every public route."""
     with tempfile.TemporaryDirectory() as temp_dir:
         temp = Path(temp_dir)
         panel_path = temp / "county_quarter_analysis.csv"
@@ -159,36 +165,30 @@ def main() -> None:
         assert home.status_code == 200
         assert b"Facility county" in home.data
         assert b"Scope and limitations" in home.data
+        assert b"Forecasting method to emphasize" not in home.data
         print("GET / -> 200")
 
         historical = client.post(
             "/predict",
-            data={"fips": "36001", "period": "2024-Q4", "method": "ml"},
+            data={"fips": "36001", "period": "2024-Q4"},
         )
         assert historical.status_code == 200
         assert b"Historical comparison" in historical.data
-        assert b"Selected forecasting method" in historical.data
+        assert b"Recommended prototype result" in historical.data
         print("POST /predict historical -> 200")
 
-        future = client.get(
-            "/api/predict?fips=36001&period=next&method=recommended"
-        )
+        future = client.get("/api/predict?fips=36001&period=next")
         assert future.status_code == 200, future.get_json()
         payload = future.get_json()
         assert payload["mode"] == "forecast"
         assert payload["period"] == "2025 Q1"
-        assert payload["selected_prediction"] is not None
+        assert payload["recommended_prediction"] is not None
+        assert payload["ml_prediction"] is None
         print("GET /api/predict next -> 200")
-
-        unavailable_ml = client.get(
-            "/api/predict?fips=36001&period=next&method=ml"
-        )
-        assert unavailable_ml.status_code == 400
-        print("Unavailable future ML -> 400")
 
         compare_page = client.get("/compare")
         assert compare_page.status_code == 200
-        assert b"Compare a method" in compare_page.data
+        assert b"Evaluate XGBoost across multiple counties" in compare_page.data
         print("GET /compare -> 200")
 
         comparison = client.post(
@@ -196,11 +196,11 @@ def main() -> None:
             data={
                 "fips": ["36001", "36005"],
                 "period": "2024-Q4",
-                "method": "ml",
             },
         )
         assert comparison.status_code == 200, comparison.get_data(as_text=True)
         assert b"Skill vs persistence" in comparison.data
+        assert b"XGBoost MAE" in comparison.data
         print("POST /compare -> 200")
 
         bad = client.get("/api/predict?fips=99999&period=next")
