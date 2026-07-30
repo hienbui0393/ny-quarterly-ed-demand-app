@@ -188,7 +188,7 @@ def main() -> None:
 
         compare_page = client.get("/compare")
         assert compare_page.status_code == 200
-        assert b"Evaluate XGBoost across multiple counties" in compare_page.data
+        assert b"Evaluate across multiple counties" in compare_page.data
         print("GET /compare -> 200")
 
         comparison = client.post(
@@ -199,8 +199,9 @@ def main() -> None:
             },
         )
         assert comparison.status_code == 200, comparison.get_data(as_text=True)
-        assert b"Skill vs persistence" in comparison.data
         assert b"XGBoost MAE" in comparison.data
+        assert b"Persistence prediction" in comparison.data
+        assert b"Skill vs persistence" in comparison.data
         print("POST /compare -> 200")
 
         bad = client.get("/api/predict?fips=99999&period=next")

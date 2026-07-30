@@ -59,13 +59,6 @@
       </strong>
       <span class="value">{{ result.recommended_prediction|count }}</span>
       <span class="unit">encounters</span>
-
-      {% if result.actual is not none %}
-      <p class="result-error">
-        Observed: <strong>{{ result.actual|count }}</strong> ·
-        Absolute error: <strong>{{ result.recommended_error|count }}</strong>
-      </p>
-      {% endif %}
     </div>
   </div>
 

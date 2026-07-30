@@ -4,7 +4,7 @@
 
 <section class="card hero-card">
   <span class="badge">Optional academic extension</span>
-  <h2>Evaluate XGBoost across multiple counties</h2>
+  <h2>Evaluate across multiple counties</h2>
   <p>
     Select two to ten facility counties and one historical quarter. The page
     compares the tuned XGBoost model with previous-quarter persistence and
@@ -84,8 +84,9 @@
           <th>Observed</th>
           <th>XGBoost prediction</th>
           <th>XGBoost error</th>
+          <th>Persistence prediction</th>
           <th>Persistence error</th>
-          <th>Skill</th>
+          <th>Skill vs persistence</th>
         </tr>
       </thead>
       <tbody>
@@ -95,6 +96,7 @@
           <td>{{ row.actual|count }}</td>
           <td>{{ row.ml_prediction|count }}</td>
           <td>{{ row.ml_error|count }}</td>
+          <td>{{ row.previous_prediction|count }}</td>
           <td>{{ row.previous_error|count }}</td>
           <td>{{ row.skill_percent|decimal }}%</td>
         </tr>
