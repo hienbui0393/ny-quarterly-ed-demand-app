@@ -1,0 +1,7 @@
+method,region,rows,MAE,mean_residual
+Previous-quarter persistence,downstate_non_nyc,16,3885.3125,1092.8125
+Previous-quarter persistence,nyc,20,4925.55,2202.25
+Previous-quarter persistence,upstate,176,595.9375,35.33522727272727
+Tuned XGBoost — level,downstate_non_nyc,16,6169.2806396484375,821.1314697265625
+Tuned XGBoost — level,nyc,20,9829.1724609375,9606.0787109375
+Tuned XGBoost — level,upstate,176,904.8003304221413,312.7061753706499

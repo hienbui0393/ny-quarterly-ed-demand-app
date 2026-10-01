@@ -1,0 +1,26 @@
+feature,feature_group,f_score,p_value,selected,rank
+target_lag1,Demand history,37917.15533244193,0.0,True,1
+target_lag2,Demand history,28784.941115128582,0.0,True,2
+target_lag3,Demand history,22665.70477898132,0.0,True,3
+target_lag4,Demand history,18816.137736330238,0.0,True,4
+acs_lag2_population_100k,Demographics,7117.07284396761,0.0,True,5
+facility_count_lag1,Demand history,6002.197116618298,0.0,True,6
+is_nyc,Geography,1497.0880658671438,1.4658330650329402e-206,True,7
+lat,Geography,574.3872814388217,3.1301704193121466e-102,True,8
+acs_lag2_pct_65plus,Demographics,245.5369460019678,4.798343995279691e-50,True,9
+acs_lag2_pct_under5,Demographics,127.93545498603132,4.041933896834335e-28,True,10
+weather_lag4_wet_days,Prior-year weather,115.79031264773346,9.929982451026204e-26,True,11
+acs_lag2_median_income,Demographics,111.12653803179198,8.352424604552415e-25,True,12
+lon,Geography,105.87343575402662,9.295510422322013e-24,True,13
+is_downstate_non_nyc,Geography,75.89818541297316,1.0969566684471162e-17,True,14
+acs_lag2_poverty_rate,Demographics,45.58870787251802,2.3712937338497345e-11,True,15
+weather_lag4_snowfall_total,Prior-year weather,33.24234874600475,1.0596151848287078e-08,False,16
+weather_lag4_hot_days,Prior-year weather,25.643200723844988,4.822625427119925e-07,False,17
+weather_lag4_tavg_mean,Prior-year weather,20.402921753475383,6.959479360696913e-06,False,18
+weather_lag4_freeze_days,Prior-year weather,20.38416246995559,7.026762561422383e-06,False,19
+weather_lag4_precip_total,Prior-year weather,15.915582612511471,7.067009299131614e-05,False,20
+is_covid,Calendar,1.6644473978341727,0.19727854890105856,False,21
+quarter_q2,Calendar,0.21072517876591618,0.6462914711950788,False,22
+post_covid,Calendar,0.1389441612915374,0.7094056583639773,False,23
+quarter_q4,Calendar,0.10493166859477909,0.7460522078372163,False,24
+quarter_q3,Calendar,0.07506626620229045,0.7841503743529477,False,25

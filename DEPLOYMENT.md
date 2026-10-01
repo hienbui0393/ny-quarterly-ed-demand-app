@@ -1,19 +1,23 @@
-# GitHub and Render deployment
+# GitHub and Render Deployment
 
-This guide applies to the final quarterly facility-county application.
+This guide preserves the original Flask deployment and updates only the processed
+data location for the SQL-refactored project.
 
-## 1. Confirm the project files
+## 1. Required generated files before deployment
 
-The `model/` folder must contain:
+After running SQL + the modeling notebook, confirm:
 
 ```text
-quarterly_ed_forecast_artifact.joblib
-quarterly_ed_xgboost_model.json
-county_quarter_analysis.csv
+model/
+├── quarterly_ed_forecast_artifact.joblib
+└── quarterly_ed_xgboost_model.json
+
+data/processed/
+└── county_quarter_analysis.csv
 ```
 
 The repository must not contain `.venv`, `__pycache__`, API keys, passwords, or
-raw unnecessary datasets.
+unnecessary raw datasets.
 
 ## 2. Test locally
 
@@ -36,22 +40,31 @@ Test:
 
 Stop the server with `Ctrl + C`.
 
-## 3. Push changes to GitHub
+## 3. Confirm app paths
 
-For an existing repository:
+`app.py` loads:
+
+- model metadata from `model/quarterly_ed_forecast_artifact.joblib`;
+- XGBoost from `model/quarterly_ed_xgboost_model.json`;
+- processed panel from `data/processed/county_quarter_analysis.csv`.
+
+Environment variables `MODEL_PATH` and `PANEL_PATH` can override the defaults.
+
+## 4. Push changes to GitHub
 
 ```powershell
 git status
 git add .
-git commit -m "Simplify final forecasting app"
+git commit -m "Refactor ED pipeline with Oracle SQL and BI layer"
 git push
 ```
 
-Before committing, confirm `.venv` and `__pycache__` are not listed.
+Before committing, confirm `.venv`, `__pycache__`, and raw source data are not
+listed.
 
-## 4. Render configuration
+## 5. Render configuration
 
-Use these settings:
+Use the existing settings:
 
 ```text
 Language: Python 3
@@ -60,9 +73,9 @@ Start command: gunicorn --workers 1 --threads 4 app:app
 Health check path: /health
 ```
 
-The `.python-version` file requests Python 3.12.8.
+`.python-version` requests Python 3.12.8.
 
-## 5. Verify the deployment
+## 6. Verify deployment
 
 Open:
 
@@ -71,3 +84,10 @@ https://ny-quarterly-ed-demand-app.onrender.com/health
 ```
 
 Confirm that `status` is `ok`, then test the main page and `/compare`.
+
+## Important deployment note
+
+The deployed Flask service does not need a live Oracle connection. Oracle is used
+upstream to prepare the versioned analytical panel, which is exported as the CSV
+that the application loads. This keeps deployment simple while the portfolio still
+demonstrates Oracle SQL, Python ML, Power BI, and Flask.

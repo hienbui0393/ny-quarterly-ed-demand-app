@@ -27,6 +27,7 @@ from xgboost import XGBRegressor
 
 BASE_DIR = Path(__file__).resolve().parent
 MODEL_DIR = BASE_DIR / "model"
+DATA_DIR = BASE_DIR / "data" / "processed"
 MODEL_PATH = Path(
     os.environ.get(
         "MODEL_PATH",
@@ -36,7 +37,7 @@ MODEL_PATH = Path(
 PANEL_PATH = Path(
     os.environ.get(
         "PANEL_PATH",
-        MODEL_DIR / "county_quarter_analysis.csv",
+        DATA_DIR / "county_quarter_analysis.csv",
     )
 )
 
@@ -123,23 +124,67 @@ def parse_period(value: str) -> tuple[int, str]:
 
 
 def load_panel(path: Path, target: str, features: list[str]) -> pd.DataFrame:
-    """Load and validate the processed facility-county-quarter panel."""
+    """Load and validate the SQL-prepared facility-county-quarter panel.
+
+    Oracle SQL owns the substantive data-preparation layer:
+    cleaning, aggregation, joins, temporal alignment, and feature engineering.
+
+    This function only normalizes the CSV interface, validates required model
+    fields, and prepares application-level period labels.
+    """
     if not path.exists():
         raise FileNotFoundError(
-            f"Analysis panel not found: {path}. See model/README.md."
+            f"Analysis panel not found: {path}. "
+            "Run the SQL pipeline and export "
+            "data/processed/county_quarter_analysis.csv."
         )
 
-    frame = pd.read_csv(path, dtype={"fips": str})
+    # SQL Developer commonly exports Oracle column names in uppercase.
+    # Normalize the CSV headers once so the Python application consistently
+    # uses lowercase snake_case names.
+    frame = pd.read_csv(path)
+    frame.columns = (
+        frame.columns
+        .astype(str)
+        .str.replace("\ufeff", "", regex=False)
+        .str.strip()
+        .str.lower()
+        .str.replace(" ", "_", regex=False)
+    )
+
+    # Keep application metadata consistent with the normalized panel headers.
+    target = str(target).strip().lower()
+    features = [
+        str(feature).strip().lower()
+        for feature in features
+    ]
+
     required = {"fips", "year", "quarter", target, *features}
-    missing = required - set(frame.columns)
+    missing = sorted(required - set(frame.columns))
     if missing:
         raise ValueError(
-            f"Analysis panel is missing required columns: {sorted(missing)}"
+            "Analysis panel is missing required columns: "
+            f"{missing}\n"
+            f"Detected columns: {frame.columns.tolist()}"
         )
 
-    frame["fips"] = frame["fips"].astype(str).str.zfill(5)
-    frame["year"] = pd.to_numeric(frame["year"], errors="raise").astype(int)
+    # Interface-level datatype normalization only. The analytical values and
+    # feature engineering themselves were already prepared in Oracle SQL.
+    frame["fips"] = (
+        frame["fips"]
+        .astype(str)
+        .str.strip()
+        .str.replace(r"\.0$", "", regex=True)
+        .str.zfill(5)
+    )
+    frame["year"] = pd.to_numeric(
+        frame["year"],
+        errors="raise",
+    ).astype(int)
     frame["quarter"] = frame["quarter"].map(normalize_quarter)
+
+    # Recompute these lightweight application fields from year + quarter so the
+    # Flask app does not depend on CSV typing for period navigation/display.
     frame["period_index"] = [
         period_index(year, quarter)
         for year, quarter in zip(frame["year"], frame["quarter"])
@@ -156,8 +201,16 @@ def load_panel(path: Path, target: str, features: list[str]) -> pd.DataFrame:
 
 
 ARTIFACT = load_artifact(MODEL_PATH)
-FEATURES = list(ARTIFACT["features"])
-TARGET = str(ARTIFACT["target"])
+
+# The SQL-export loading layer normalizes all panel headers to lowercase.
+# Normalize saved feature/target names as well so the model artifact and
+# production panel use one naming convention.
+FEATURES = [
+    str(feature).strip().lower()
+    for feature in ARTIFACT["features"]
+]
+TARGET = str(ARTIFACT["target"]).strip().lower()
+
 PANEL = load_panel(PANEL_PATH, TARGET, FEATURES)
 
 NAME_COL = next(

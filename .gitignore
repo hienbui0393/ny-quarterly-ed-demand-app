@@ -18,3 +18,14 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Raw source data are reproducible / imported into Oracle and should not be committed.
+data/raw/
+
+# Local Oracle / SQL Developer exports or scratch files
+*.log
+*.lst
+
+# Power BI lock / temporary files
+~$*.pbix
+*.pbix.tmp

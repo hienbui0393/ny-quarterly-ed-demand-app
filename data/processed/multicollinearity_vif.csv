@@ -1,0 +1,14 @@
+feature,VIF
+target_lag3,60.32942932747359
+target_lag2,59.66091383705489
+target_lag1,45.826867870448275
+target_lag4,45.23640489705026
+acs_lag2_population_100k,9.904407673158381
+facility_count_lag1,7.835623640474606
+weather_lag4_tavg_mean,5.468659556291018
+weather_lag4_snowfall_total,5.346612421025604
+acs_lag2_median_income,3.5394841849004246
+acs_lag2_poverty_rate,3.459191907925973
+acs_lag2_pct_65plus,1.9187754979103093
+acs_lag2_pct_under5,1.7113232503230347
+weather_lag4_precip_total,1.1613605938250589

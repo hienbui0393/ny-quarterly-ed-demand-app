@@ -5,3 +5,7 @@ numpy==2.0.2
 pandas==2.2.2
 scikit-learn==1.6.1
 xgboost==3.3.0
+matplotlib>=3.9,<4
+requests>=2.32,<3
+shap>=0.46,<1
+ipykernel>=6.29,<7

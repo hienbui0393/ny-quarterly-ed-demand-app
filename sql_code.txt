@@ -1,0 +1,843 @@
+Part A — Run this whole block together with F5 / Run Script
+You can paste everything below into one worksheet and run it once with F5.
+
+/* ============================================================
+   COUNTY QUARTER ANALYSIS PIPELINE
+   Run this entire section together with F5 / Run Script.
+
+   RAW TABLES USED:
+     RAW_SPARCS_ED_FACILITY_QUARTER
+     RAW_CENSUS_ACS_COUNTY
+     RAW_NY_COUNTY_GEO
+     RAW_WEATHER_DAILY_BY_COUNTY
+
+   RAW_SPARCS_PPV_BY_COUNTY is preserved but is NOT used
+   because the target county_quarter_analysis.csv does not
+   contain PPV-derived columns.
+
+   FINAL GRAIN:
+     One row = one county + one calendar quarter
+   ============================================================ */
+
+
+/* ============================================================
+   STEP 1 — CLEAN SPARCS ED DATA
+   ============================================================
+
+   - Remove statewide records without county FIPS.
+   - Keep Q1-Q4 only; exclude CY annual totals.
+   - Convert numeric strings to NUMBER.
+   - Suppressed values such as "S" become NULL.
+   ============================================================ */
+
+CREATE OR REPLACE VIEW STG_SPARCS_ED AS
+SELECT
+    year,
+    quarter,
+    facility_id,
+    facility_name,
+
+    CASE
+        WHEN REGEXP_LIKE(
+            TRIM(total_ed_encounters),
+            '^[0-9]+$'
+        )
+        THEN TO_NUMBER(total_ed_encounters)
+    END AS total_ed_encounters,
+
+    CASE
+        WHEN REGEXP_LIKE(
+            TRIM(treat_and_release_ed),
+            '^[0-9]+$'
+        )
+        THEN TO_NUMBER(treat_and_release_ed)
+    END AS treat_and_release_ed,
+
+    CASE
+        WHEN REGEXP_LIKE(
+            TRIM(ed_encounters_requiring),
+            '^[0-9]+$'
+        )
+        THEN TO_NUMBER(ed_encounters_requiring)
+    END AS ed_encounters_requiring,
+
+    CASE
+        WHEN REGEXP_LIKE(
+            TRIM(ed_encounters_admitted_as),
+            '^[0-9]+$'
+        )
+        THEN TO_NUMBER(ed_encounters_admitted_as)
+    END AS ed_encounters_admitted_as,
+
+    LPAD(
+        TRIM(facility_county_fips),
+        5,
+        '0'
+    ) AS fips
+
+FROM RAW_SPARCS_ED_FACILITY_QUARTER
+
+WHERE facility_county_fips IS NOT NULL
+  AND quarter IN ('Q1', 'Q2', 'Q3', 'Q4');
+
+
+/* ============================================================
+   STEP 2 — AGGREGATE ED TO COUNTY-QUARTER
+   ============================================================
+
+   Source grain:
+       facility + quarter
+
+   New grain:
+       county + quarter
+
+   period_index lets us calculate exact quarter lags later.
+
+   Example:
+       2018 Q1 = 2018 * 4 + 1 = 8073
+   ============================================================ */
+
+CREATE OR REPLACE VIEW INT_ED_COUNTY_QUARTER AS
+SELECT
+    fips,
+    year,
+    quarter,
+
+    CASE quarter
+        WHEN 'Q1' THEN 1
+        WHEN 'Q2' THEN 2
+        WHEN 'Q3' THEN 3
+        WHEN 'Q4' THEN 4
+    END AS quarter_num,
+
+    year * 4 +
+    CASE quarter
+        WHEN 'Q1' THEN 1
+        WHEN 'Q2' THEN 2
+        WHEN 'Q3' THEN 3
+        WHEN 'Q4' THEN 4
+    END AS period_index,
+
+    SUM(total_ed_encounters)
+        AS total_ed_encounters,
+
+    SUM(treat_and_release_ed)
+        AS treat_and_release_ed,
+
+    SUM(ed_encounters_requiring)
+        AS ed_encounters_requiring,
+
+    SUM(ed_encounters_admitted_as)
+        AS ed_encounters_admitted_as,
+
+    COUNT(DISTINCT facility_id)
+        AS facility_count,
+
+    SUM(total_ed_encounters)
+      - SUM(treat_and_release_ed)
+      - SUM(ed_encounters_requiring)
+      - SUM(ed_encounters_admitted_as)
+        AS component_gap
+
+FROM STG_SPARCS_ED
+
+GROUP BY
+    fips,
+    year,
+    quarter
+
+HAVING COUNT(total_ed_encounters) > 0;
+
+
+/* ============================================================
+   STEP 3 — CLEAN / ENGINEER CENSUS ACS
+   ============================================================
+
+   Build 5-digit FIPS:
+       state 36 + county 001 = 36001
+
+   Create:
+     population
+     median income
+     poverty rate
+     % under age 5
+     % age 65+
+   ============================================================ */
+
+CREATE OR REPLACE VIEW STG_CENSUS_ACS AS
+SELECT
+    LPAD(TRIM(state), 2, '0')
+        || LPAD(TRIM(county), 3, '0')
+        AS fips,
+
+    year,
+
+    B01003_001E
+        AS population,
+
+    B19013_001E
+        AS median_income,
+
+    100.0 * B17001_002E
+        / NULLIF(B17001_001E, 0)
+        AS poverty_rate,
+
+    100.0 * (
+        B01001_003E
+        + B01001_027E
+    )
+    / NULLIF(B01001_001E, 0)
+        AS pct_under5,
+
+    100.0 * (
+        B01001_020E +
+        B01001_021E +
+        B01001_022E +
+        B01001_023E +
+        B01001_024E +
+        B01001_025E +
+        B01001_044E +
+        B01001_045E +
+        B01001_046E +
+        B01001_047E +
+        B01001_048E +
+        B01001_049E
+    )
+    / NULLIF(B01001_001E, 0)
+        AS pct_65plus
+
+FROM RAW_CENSUS_ACS_COUNTY;
+
+
+/* ============================================================
+   STEP 4 — CLEAN COUNTY GEOGRAPHY
+   ============================================================ */
+
+CREATE OR REPLACE VIEW STG_COUNTY_GEO AS
+SELECT
+    LPAD(
+        TRIM(fips),
+        5,
+        '0'
+    ) AS fips,
+
+    county_name,
+    lat,
+    lon
+
+FROM RAW_NY_COUNTY_GEO;
+
+
+/* ============================================================
+   STEP 5 — AGGREGATE DAILY WEATHER TO COUNTY-QUARTER
+   ============================================================
+
+   Raw grain:
+       county + day
+
+   New grain:
+       county + quarter
+
+   NOTE:
+   You imported the original CSV "date" column as WEATHER_DATE.
+   ============================================================ */
+
+CREATE OR REPLACE VIEW INT_WEATHER_COUNTY_QUARTER AS
+SELECT
+    LPAD(
+        TRIM(fips),
+        5,
+        '0'
+    ) AS fips,
+
+    EXTRACT(YEAR FROM weather_date)
+        AS year,
+
+    'Q' || TO_CHAR(weather_date, 'Q')
+        AS quarter,
+
+    COUNT(*)
+        AS days_observed,
+
+    AVG(
+        (tmax + tmin) / 2
+    )
+        AS tavg_mean,
+
+    SUM(precip)
+        AS precip_total,
+
+    SUM(snowfall)
+        AS snowfall_total,
+
+    SUM(
+        CASE
+            WHEN tmax >= 90 THEN 1
+            ELSE 0
+        END
+    )
+        AS hot_days,
+
+    SUM(
+        CASE
+            WHEN tmin <= 32 THEN 1
+            ELSE 0
+        END
+    )
+        AS freeze_days,
+
+    SUM(
+        CASE
+            WHEN precip > 0.01 THEN 1
+            ELSE 0
+        END
+    )
+        AS wet_days
+
+FROM RAW_WEATHER_DAILY_BY_COUNTY
+
+GROUP BY
+    LPAD(
+        TRIM(fips),
+        5,
+        '0'
+    ),
+
+    EXTRACT(YEAR FROM weather_date),
+
+    'Q' || TO_CHAR(weather_date, 'Q');
+
+
+/* ============================================================
+   STEP 6 — COMBINE ED + GEO + ACS + WEATHER
+   ============================================================
+
+   Time alignment used by your final dataset:
+
+       ED year = Y
+       ACS source year = Y - 2
+       Weather = same quarter from Y - 1
+
+   Example:
+       ED:      2018 Q1
+       ACS:     2016
+       Weather: 2017 Q1
+   ============================================================ */
+
+CREATE OR REPLACE VIEW INT_COUNTY_QUARTER_BASE AS
+SELECT
+    /* Core identifiers */
+    e.fips,
+    e.year,
+    e.quarter,
+    e.quarter_num,
+    e.period_index,
+
+    /* ED */
+    e.total_ed_encounters,
+    e.treat_and_release_ed,
+    e.ed_encounters_requiring,
+    e.ed_encounters_admitted_as,
+    e.facility_count,
+    e.component_gap,
+
+    /* Geography */
+    g.county_name,
+    g.lat,
+    g.lon,
+
+    /* ACS — two-year lag */
+    a.population
+        AS acs_lag2_population,
+
+    a.median_income
+        AS acs_lag2_median_income,
+
+    a.poverty_rate
+        AS acs_lag2_poverty_rate,
+
+    a.pct_under5
+        AS acs_lag2_pct_under5,
+
+    a.pct_65plus
+        AS acs_lag2_pct_65plus,
+
+    a.year
+        AS acs_source_year,
+
+    a.population / 100000.0
+        AS acs_lag2_population_100k,
+
+    /* Weather — four-quarter / one-year lag */
+    w.days_observed
+        AS weather_lag4_days_observed,
+
+    w.tavg_mean
+        AS weather_lag4_tavg_mean,
+
+    w.precip_total
+        AS weather_lag4_precip_total,
+
+    w.snowfall_total
+        AS weather_lag4_snowfall_total,
+
+    w.hot_days
+        AS weather_lag4_hot_days,
+
+    w.freeze_days
+        AS weather_lag4_freeze_days,
+
+    w.wet_days
+        AS weather_lag4_wet_days,
+
+    w.year
+        AS weather_source_year
+
+FROM INT_ED_COUNTY_QUARTER e
+
+JOIN STG_COUNTY_GEO g
+    ON e.fips = g.fips
+
+JOIN STG_CENSUS_ACS a
+    ON e.fips = a.fips
+   AND a.year = e.year - 2
+
+JOIN INT_WEATHER_COUNTY_QUARTER w
+    ON e.fips = w.fips
+   AND w.year = e.year - 1
+   AND w.quarter = e.quarter;
+
+
+/* ============================================================
+   STEP 7 — CREATE FINAL FEATURE VIEW
+   ============================================================
+
+   Adds exact quarter lags:
+       target_lag1
+       target_lag2
+       target_lag3
+       target_lag4
+
+   We use period_index joins rather than normal LAG()
+   because we want the exact previous calendar quarter.
+
+   IMPORTANT:
+   Never put "/" by itself on a line when using F5.
+   ============================================================ */
+
+CREATE OR REPLACE VIEW FINAL_COUNTY_QUARTER_ANALYSIS AS
+SELECT
+    /* ========================================================
+       IDENTIFIERS
+       ======================================================== */
+
+    b.fips,
+    b.year,
+    b.quarter,
+    b.quarter_num,
+    b.period_index,
+
+    /* ========================================================
+       ED
+       ======================================================== */
+
+    b.total_ed_encounters,
+    b.treat_and_release_ed,
+    b.ed_encounters_requiring,
+    b.ed_encounters_admitted_as,
+    b.facility_count,
+    b.component_gap,
+
+    /* ========================================================
+       GEOGRAPHY
+       ======================================================== */
+
+    b.county_name,
+    b.lat,
+    b.lon,
+
+    /* ========================================================
+       TARGET LAGS
+       ======================================================== */
+
+    l1.total_ed_encounters
+        AS target_lag1,
+
+    l2.total_ed_encounters
+        AS target_lag2,
+
+    l3.total_ed_encounters
+        AS target_lag3,
+
+    l4.total_ed_encounters
+        AS target_lag4,
+
+    /* Average of the previous four exact quarters */
+    CASE
+        WHEN l1.total_ed_encounters IS NOT NULL
+         AND l2.total_ed_encounters IS NOT NULL
+         AND l3.total_ed_encounters IS NOT NULL
+         AND l4.total_ed_encounters IS NOT NULL
+        THEN (
+            l1.total_ed_encounters
+            + l2.total_ed_encounters
+            + l3.total_ed_encounters
+            + l4.total_ed_encounters
+        ) / 4.0
+    END AS target_roll4,
+
+    l1.facility_count
+        AS facility_count_lag1,
+
+    /* ========================================================
+       ACS
+       ======================================================== */
+
+    b.acs_lag2_population,
+    b.acs_lag2_median_income,
+    b.acs_lag2_poverty_rate,
+    b.acs_lag2_pct_under5,
+    b.acs_lag2_pct_65plus,
+    b.acs_source_year,
+    b.acs_lag2_population_100k,
+
+    /* ========================================================
+       WEATHER
+       ======================================================== */
+
+    b.weather_lag4_days_observed,
+    b.weather_lag4_tavg_mean,
+    b.weather_lag4_precip_total,
+    b.weather_lag4_snowfall_total,
+    b.weather_lag4_hot_days,
+    b.weather_lag4_freeze_days,
+    b.weather_lag4_wet_days,
+    b.weather_source_year,
+
+    /* ========================================================
+       COVID FLAGS
+       ======================================================== */
+
+    CASE
+        WHEN b.year IN (2020, 2021)
+        THEN 1
+        ELSE 0
+    END AS is_covid,
+
+    CASE
+        WHEN b.year >= 2022
+        THEN 1
+        ELSE 0
+    END AS post_covid,
+
+    /* ========================================================
+       QUARTER DUMMY VARIABLES
+
+       Q1 is the reference group.
+       ======================================================== */
+
+    CASE
+        WHEN b.quarter = 'Q2'
+        THEN 1
+        ELSE 0
+    END AS quarter_Q2,
+
+    CASE
+        WHEN b.quarter = 'Q3'
+        THEN 1
+        ELSE 0
+    END AS quarter_Q3,
+
+    CASE
+        WHEN b.quarter = 'Q4'
+        THEN 1
+        ELSE 0
+    END AS quarter_Q4,
+
+    /* ========================================================
+       NYC FLAG
+       ======================================================== */
+
+    CASE
+        WHEN b.fips IN (
+            '36005',
+            '36047',
+            '36061',
+            '36081',
+            '36085'
+        )
+        THEN 1
+        ELSE 0
+    END AS is_nyc,
+
+    /* ========================================================
+       DOWNSTATE NON-NYC FLAG
+       ======================================================== */
+
+    CASE
+        WHEN b.fips IN (
+            '36059',
+            '36087',
+            '36103',
+            '36119'
+        )
+        THEN 1
+        ELSE 0
+    END AS is_downstate_non_nyc,
+
+    /* ========================================================
+       REGION
+       ======================================================== */
+
+    CASE
+        WHEN b.fips IN (
+            '36005',
+            '36047',
+            '36061',
+            '36081',
+            '36085'
+        )
+        THEN 'nyc'
+
+        WHEN b.fips IN (
+            '36059',
+            '36087',
+            '36103',
+            '36119'
+        )
+        THEN 'downstate_non_nyc'
+
+        ELSE 'upstate'
+    END AS region,
+
+    /* ========================================================
+       ED ENCOUNTERS PER 100K POPULATION
+       ======================================================== */
+
+    b.total_ed_encounters
+        / NULLIF(b.acs_lag2_population_100k, 0)
+        AS facility_ed_encounters_per_100k_proxy
+
+FROM INT_COUNTY_QUARTER_BASE b
+
+/* Exactly one quarter earlier */
+LEFT JOIN INT_COUNTY_QUARTER_BASE l1
+    ON b.fips = l1.fips
+   AND l1.period_index = b.period_index - 1
+
+/* Exactly two quarters earlier */
+LEFT JOIN INT_COUNTY_QUARTER_BASE l2
+    ON b.fips = l2.fips
+   AND l2.period_index = b.period_index - 2
+
+/* Exactly three quarters earlier */
+LEFT JOIN INT_COUNTY_QUARTER_BASE l3
+    ON b.fips = l3.fips
+   AND l3.period_index = b.period_index - 3
+
+/* Exactly four quarters earlier */
+LEFT JOIN INT_COUNTY_QUARTER_BASE l4
+    ON b.fips = l4.fips
+   AND l4.period_index = b.period_index - 4;
+   
+   
+==================================
+   If successful, the script output should include messages like:
+View STG_SPARCS_ED created.
+View INT_ED_COUNTY_QUARTER created.
+View STG_CENSUS_ACS created.
+View STG_COUNTY_GEO created.
+View INT_WEATHER_COUNTY_QUARTER created.
+View INT_COUNTY_QUARTER_BASE created.
+View FINAL_COUNTY_QUARTER_ANALYSIS created.
+
+================================================
+
+Part B — Run these separately, one at a time
+For these, I recommend using Ctrl + Enter / Run Statement, not F5. That way you can inspect each result before proceeding.
+Check 1 — Final row count
+Run only this:
+SELECT COUNT(*) AS final_row_count
+FROM FINAL_COUNTY_QUARTER_ANALYSIS;
+
+Expected:
+1536
+
+Your uploaded target contains 1,536 data rows. 
+Check 2 — Number of counties
+Run separately:
+SELECT COUNT(DISTINCT fips) AS county_count
+FROM FINAL_COUNTY_QUARTER_ANALYSIS;
+
+Expected:
+57
+
+Check 3 — Year range
+Run separately:
+SELECT
+    MIN(year) AS min_year,
+    MAX(year) AS max_year
+FROM FINAL_COUNTY_QUARTER_ANALYSIS;
+
+Expected:
+MIN_YEAR    MAX_YEAR
+2018        2024
+
+Check 4 — Duplicate county-quarter rows
+Run separately:
+SELECT
+    fips,
+    year,
+    quarter,
+    COUNT(*) AS row_count
+FROM FINAL_COUNTY_QUARTER_ANALYSIS
+GROUP BY
+    fips,
+    year,
+    quarter
+HAVING COUNT(*) > 1;
+
+Expected:
+no rows
+
+This validates your table's grain:
+one row = one county + one quarter.
+
+Check 5 — Missing county geography
+Run separately:
+SELECT *
+FROM FINAL_COUNTY_QUARTER_ANALYSIS
+WHERE county_name IS NULL;
+
+Expected:
+no rows
+
+Check 6 — Negative ED totals
+Run separately:
+SELECT *
+FROM FINAL_COUNTY_QUARTER_ANALYSIS
+WHERE total_ed_encounters < 0;
+
+Expected:
+no rows
+
+Check 7 — Look at the first 20 rows
+Run separately:
+SELECT *
+FROM FINAL_COUNTY_QUARTER_ANALYSIS
+ORDER BY
+    year,
+    quarter_num,
+    fips
+FETCH FIRST 20 ROWS ONLY;
+
+Compare the first Albany row to your original CSV. The target begins with Albany, 2018 Q1, FIPS 36001, total encounters 42951, ACS source year 2016, and weather source year 2017.
+
+========================================== 
+Part C — Run this separately only when you're ready to export
+Use Ctrl + Enter:
+SELECT *
+FROM FINAL_COUNTY_QUARTER_ANALYSIS
+ORDER BY
+    year,
+    quarter_num,
+    fips;
+
+Then in the result grid:
+Right-click → Export → CSV
+Suggested filename:
+county_quarter_analysis_sql.csv
+
+So your workflow is simply:
+PART A
+Entire CREATE VIEW script
+→ run together with F5
+
+      ↓
+
+PART B
+Validation SELECTs
+→ run one at a time with Ctrl+Enter
+
+      ↓
+
+PART C
+Final SELECT
+→ run separately
+→ Export CSV
+
+
+Data cleaning, aggregation, joins, and feature engineering in SQL; machine learning and evaluation in Python.
+
+================================= SQL for BI
+
+But a BI/Data Analyst employer also wants evidence of:
+SQL analysis
+So after your final dataset is created, add maybe 4–6 queries, not another giant pipeline.
+For example:
+A. Quarterly ED trend
+SELECT
+    year,
+    quarter,
+    SUM(total_ed_encounters) AS total_ed_encounters
+FROM FINAL_COUNTY_QUARTER_ANALYSIS
+GROUP BY year, quarter, quarter_num
+ORDER BY year, quarter_num;
+
+This feeds a Power BI statewide trend chart.
+B. Highest-utilization counties
+SELECT
+    county_name,
+    AVG(facility_ed_encounters_per_100k_proxy) AS avg_ed_per_100k
+FROM FINAL_COUNTY_QUARTER_ANALYSIS
+GROUP BY county_name
+ORDER BY avg_ed_per_100k DESC
+FETCH FIRST 10 ROWS ONLY;
+
+Now you're demonstrating ranking/business analysis rather than just pipeline construction.
+C. Region comparison
+SELECT
+    region,
+    AVG(total_ed_encounters) AS avg_quarterly_ed,
+    AVG(facility_ed_encounters_per_100k_proxy) AS avg_ed_per_100k
+FROM FINAL_COUNTY_QUARTER_ANALYSIS
+GROUP BY region
+ORDER BY avg_quarterly_ed DESC;
+
+Useful for:
+- NYC
+- downstate non-NYC
+- upstate
+D. Quarter-over-quarter change
+This is particularly valuable for your resume because it shows window functions.
+WITH quarterly AS (
+    SELECT
+        fips,
+        county_name,
+        year,
+        quarter,
+        quarter_num,
+        period_index,
+        total_ed_encounters,
+        LAG(total_ed_encounters) OVER (
+            PARTITION BY fips
+            ORDER BY period_index
+        ) AS previous_quarter
+    FROM FINAL_COUNTY_QUARTER_ANALYSIS
+)
+SELECT
+    *,
+    100.0 * (total_ed_encounters - previous_quarter)
+        / NULLIF(previous_quarter, 0) AS qoq_pct_change
+FROM quarterly;
+
+This is exactly the kind of SQL I like seeing in a Data Analyst portfolio.
+E. Year-over-year change
+Use four-quarter lag:
+LAG(total_ed_encounters, 4)
+OVER (
+    PARTITION BY fips
+    ORDER BY period_index
+)
+
+Then calculate % YoY.

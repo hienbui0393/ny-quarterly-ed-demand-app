@@ -1,0 +1,16 @@
+feature,selected_quarters,selection_rate
+acs_lag2_median_income,12,1.0
+acs_lag2_pct_65plus,12,1.0
+acs_lag2_pct_under5,12,1.0
+acs_lag2_population_100k,12,1.0
+acs_lag2_poverty_rate,12,1.0
+facility_count_lag1,12,1.0
+is_downstate_non_nyc,12,1.0
+is_nyc,12,1.0
+lat,12,1.0
+lon,12,1.0
+target_lag1,12,1.0
+target_lag2,12,1.0
+target_lag3,12,1.0
+target_lag4,12,1.0
+weather_lag4_wet_days,12,1.0

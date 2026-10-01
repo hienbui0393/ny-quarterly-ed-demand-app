@@ -1,0 +1,26 @@
+feature,group
+acs_lag2_population_100k,Demographics
+acs_lag2_median_income,Demographics
+acs_lag2_poverty_rate,Demographics
+acs_lag2_pct_under5,Demographics
+acs_lag2_pct_65plus,Demographics
+weather_lag4_tavg_mean,Prior-year weather
+weather_lag4_precip_total,Prior-year weather
+weather_lag4_snowfall_total,Prior-year weather
+weather_lag4_hot_days,Prior-year weather
+weather_lag4_freeze_days,Prior-year weather
+weather_lag4_wet_days,Prior-year weather
+target_lag1,Demand history
+target_lag2,Demand history
+target_lag3,Demand history
+target_lag4,Demand history
+facility_count_lag1,Demand history
+quarter_q2,Calendar
+quarter_q3,Calendar
+quarter_q4,Calendar
+is_covid,Calendar
+post_covid,Calendar
+lat,Geography
+lon,Geography
+is_nyc,Geography
+is_downstate_non_nyc,Geography
